@@ -1,0 +1,8 @@
+apexdns {
+    http :8080
+    udp :5353
+}
+
+. {
+    upstream udp://8.8.8.8:53
+}
