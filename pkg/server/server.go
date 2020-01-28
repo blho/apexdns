@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"time"
+	"strings"
 
 	"github.com/blho/apexdns/pkg/types"
 
@@ -15,37 +15,18 @@ import (
 )
 
 type Server struct {
-	endpoints     []Endpoint
-	logger        *logrus.Logger
-	opts          Options
-	conf          RootConfig
-	zoneConfigMap map[string]types.ZoneConfig
-	// DNS query clients
-	udpClient *dns.Client
-	tcpClient *dns.Client
-	tlsClient *dns.Client
+	endpoints  []Endpoint
+	logger     *logrus.Logger
+	opts       Options
+	conf       RootConfig
+	zoneEngine map[string]*Engine
 }
 
 func New(opts Options) (*Server, error) {
-	timeout := time.Second * 3
 	s := &Server{
-		zoneConfigMap: make(map[string]types.ZoneConfig),
-		opts:          opts,
-		udpClient: &dns.Client{
-			Net:     "udp",
-			UDPSize: dns.DefaultMsgSize,
-			Timeout: timeout,
-		},
-		tcpClient: &dns.Client{
-			Net:     "tcp",
-			Timeout: timeout,
-		},
-		tlsClient: &dns.Client{
-			Net:     "tcp-tls",
-			Timeout: timeout,
-		},
+		zoneEngine: make(map[string]*Engine),
+		opts:       opts,
 	}
-	s.logger = logs.MustSetup()
 	if err := s.setup(); err != nil {
 		return nil, err
 	}
@@ -55,12 +36,48 @@ func New(opts Options) (*Server, error) {
 func (s *Server) setup() error {
 	for _, setupFunc := range []func() error{
 		s.loadConfigFile,
+		s.setupLogger,
 		s.setupEndpoints,
+		s.setupEngine,
 	} {
 		if err := setupFunc(); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+func (s *Server) loadConfigFile() error {
+	configFile, err := ioutil.ReadFile(s.opts.ConfigPath)
+	if err != nil {
+		return err
+	}
+	blocks, err := caddyfile.Parse(s.opts.ConfigPath, bytes.NewReader(configFile), nil)
+	if err != nil {
+		return err
+	}
+	for _, block := range blocks {
+		// Get the first key of block
+		zone := block.Keys[0]
+		if zone == "apexdns" {
+			// Is a root config
+			rootConfig, err := ParseRootConfig(block)
+			if err != nil {
+				return err
+			}
+			s.conf = *rootConfig
+			break
+		}
+	}
+	return nil
+}
+
+func (s *Server) setupLogger() error {
+	level, err := logrus.ParseLevel(s.conf.LogLevel)
+	if err != nil {
+		return err
+	}
+	s.logger = logs.MustSetup(logs.WithLogLevel(level), logs.WithSourceHook())
 	return nil
 }
 
@@ -89,7 +106,7 @@ func (s *Server) setupEndpoints() error {
 	return nil
 }
 
-func (s *Server) loadConfigFile() error {
+func (s *Server) setupEngine() error {
 	configFile, err := ioutil.ReadFile(s.opts.ConfigPath)
 	if err != nil {
 		return err
@@ -99,23 +116,16 @@ func (s *Server) loadConfigFile() error {
 		return err
 	}
 	for _, block := range blocks {
-		// Get the first key of block
+		if len(block.Keys) == 0 {
+			continue
+		}
 		zone := block.Keys[0]
-		if zone == "apexdns" {
-			// Is a root config
-			rootConfig, err := ParseRootConfig(block)
+		if dns.IsFqdn(zone) {
+			eng, err := NewEngine(s.logger.WithField("zone", zone), block.Tokens)
 			if err != nil {
 				return err
 			}
-			s.conf = *rootConfig
-		} else if dns.IsFqdn(zone) {
-			zoneConfig, err := ParseZoneConfig(block)
-			if err != nil {
-				return err
-			}
-			s.zoneConfigMap[zone] = *zoneConfig
-		} else {
-			return fmt.Errorf("invalid config: %s", zone)
+			s.zoneEngine[zone] = eng
 		}
 	}
 	return nil
@@ -128,13 +138,22 @@ func (s *Server) handleContext(ctx *types.Context) {
 		logger.WithError(err).Warn("Unable to handle context")
 		return
 	}
-	response, _, err := s.tlsClient.Exchange(ctx.GetQueryMessage(), "dns.google:853")
-	if err != nil {
-		logger.WithError(err).Error("Unable to exchange query")
-		ctx.AbortWithErr(err)
-		return
+	// Find the engine to handle this context
+	eng := s.findBestMatchZoneEngine(ctx.GetQueryMessage().Question[0].Name)
+	eng.Handle(ctx)
+}
+
+func (s *Server) findBestMatchZoneEngine(fqdn string) *Engine {
+	maxMatchLength := 0
+	var matchEngine *Engine
+	for zone, eng := range s.zoneEngine {
+		if strings.HasSuffix(fqdn, zone) && len(zone) > maxMatchLength {
+			s.logger.Debugf("Hit zone: %s", zone)
+			matchEngine = eng
+			maxMatchLength = len(zone)
+		}
 	}
-	ctx.SetResponse(response)
+	return matchEngine
 }
 
 func (s *Server) Run() {
