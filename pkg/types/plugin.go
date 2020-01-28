@@ -1,8 +1,13 @@
 package types
 
+import (
+	"github.com/caddyserver/caddy/caddyfile"
+	"github.com/sirupsen/logrus"
+)
+
 type HandleFunc func(*Context)
 
-type PluginSetupFunc func()
+type PluginSetupFunc func(PluginConfig) (Plugin, error)
 
 type Plugin interface {
 	Name() string
@@ -15,6 +20,7 @@ type PluginInitializer struct {
 	SetupFunc   PluginSetupFunc
 }
 
-type ZoneConfig struct {
-	Zone string
+type PluginConfig struct {
+	Logger *logrus.Entry
+	caddyfile.Dispenser
 }

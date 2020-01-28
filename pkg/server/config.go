@@ -2,12 +2,19 @@ package server
 
 import (
 	"fmt"
-	"github.com/blho/apexdns/pkg/types"
+
 	"github.com/caddyserver/caddy/caddyfile"
 )
 
 type RootConfig struct {
 	Endpoints []EndpointConfig
+	LogLevel  string
+}
+
+func NewDefaultRootConfig() *RootConfig {
+	return &RootConfig{
+		LogLevel: "debug",
+	}
 }
 
 type EndpointConfig struct {
@@ -19,7 +26,7 @@ type EndpointConfig struct {
 }
 
 func ParseRootConfig(block caddyfile.ServerBlock) (*RootConfig, error) {
-	c := new(RootConfig)
+	c := NewDefaultRootConfig()
 	for tokenKey, tokens := range block.Tokens {
 		switch tokenKey {
 		// HTTP: http :8080
@@ -47,12 +54,13 @@ func ParseRootConfig(block caddyfile.ServerBlock) (*RootConfig, error) {
 			} else {
 				return nil, fmt.Errorf("invalid HTTP endpoint config: %v", tokens)
 			}
+		case "log":
+			if len(tokens) == 2 {
+				c.LogLevel = tokens[1].Text
+			} else {
+				return nil, fmt.Errorf("invalid log config: %v", tokens)
+			}
 		}
 	}
 	return c, nil
-}
-
-func ParseZoneConfig(block caddyfile.ServerBlock) (*types.ZoneConfig, error) {
-
-	return &types.ZoneConfig{}, nil
 }
