@@ -11,22 +11,24 @@ import (
 
 // NewCommand of ApexDNS server
 func NewCommand() *cobra.Command {
+	opt := server.NewDefaultOptions()
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "Run ApexDNS server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := Run(); err != nil {
+			if err := Run(opt); err != nil {
 				return err
 			}
 			return nil
 		},
 	}
+	opt.AddFlags(cmd.Flags())
 	return cmd
 }
 
 // Run will start running and returns error if something unexpected
-func Run() error {
-	s, err := server.New()
+func Run(opt *server.Options) error {
+	s, err := server.New(*opt)
 	if err != nil {
 		return err
 	}
