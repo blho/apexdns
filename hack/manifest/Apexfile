@@ -3,6 +3,16 @@ apexdns {
     udp :5353
 }
 
-. {
-    upstream udp://8.8.8.8:53
+heidong.io. {
+    upstream {
+        tcp-tls 8.8.8.8:853
+    }
 }
+
+. {
+    upstream 5s {
+        udp 8.8.8.8:53
+        tcp-tls 8.8.8.8:853
+    }
+}
+
