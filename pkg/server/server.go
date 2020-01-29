@@ -36,8 +36,8 @@ func (s *Server) setup() error {
 	for _, setupFunc := range []func() error{
 		s.loadConfigFile,
 		s.setupLogger,
-		s.setupEndpoints,
 		s.setupEngine,
+		s.setupEndpoints,
 	} {
 		if err := setupFunc(); err != nil {
 			return err
