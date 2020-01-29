@@ -3,6 +3,7 @@ package server
 import (
 	"syscall"
 
+	_ "github.com/blho/apexdns/pkg/endpoints"
 	_ "github.com/blho/apexdns/pkg/plugins"
 	"github.com/blho/apexdns/pkg/server"
 

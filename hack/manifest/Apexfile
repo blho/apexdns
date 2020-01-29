@@ -1,6 +1,7 @@
 apexdns {
     http :8080
     udp :5353
+    log debug
 }
 
 heidong.io. {

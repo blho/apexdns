@@ -33,7 +33,7 @@ func (e *Engine) loadPlugins(tokens map[string][]caddyfile.Token) error {
 		}
 		plugin, err := pluginInitializer.SetupFunc(types.PluginConfig{
 			Logger:    e.logger,
-			Dispenser: caddyfile.NewDispenserTokens("inner", tokens),
+			Dispenser: caddyfile.NewDispenserTokens("engine_plugin", tokens),
 		})
 		if err != nil {
 			return err
