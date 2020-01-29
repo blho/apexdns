@@ -1,0 +1,14 @@
+[Unit]
+Description=ApexDNS Server
+After=network.target
+
+[Service]
+Restart=always
+StartLimitInterval=0
+RestartSec=10
+LimitNOFILE=327680
+EnvironmentFile=/etc/default/apexdns
+ExecStart=/usr/local/bin/apexdns server $DAEMON_AEGS
+
+[Install]
+WantedBy=multi-user.target
