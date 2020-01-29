@@ -1,4 +1,4 @@
-package server
+package http
 
 import (
 	"context"
@@ -20,17 +20,17 @@ import (
 	"golang.org/x/net/idna"
 )
 
-type HTTPEndpoint struct {
+type Endpoint struct {
 	httpServer *http.Server
 	certFile   string
 	keyFile    string
 	stopCh     chan struct{}
 	userAgent  string
-	handler    ContextHandler
+	handler    types.ContextHandler
 }
 
-func NewHTTPEndpoint(listenAddress string, certFile, keyFile string, handler ContextHandler) (Endpoint, error) {
-	e := &HTTPEndpoint{
+func New(listenAddress string, certFile, keyFile string, handler types.ContextHandler) (*Endpoint, error) {
+	e := &Endpoint{
 		certFile:  certFile,
 		keyFile:   keyFile,
 		stopCh:    make(chan struct{}),
@@ -45,14 +45,14 @@ func NewHTTPEndpoint(listenAddress string, certFile, keyFile string, handler Con
 	return e, nil
 }
 
-func (e *HTTPEndpoint) Run() error {
+func (e *Endpoint) Run() error {
 	if e.certFile != "" || e.keyFile != "" {
 		return e.httpServer.ListenAndServeTLS(e.certFile, e.keyFile)
 	}
 	return e.httpServer.ListenAndServe()
 }
 
-func (e *HTTPEndpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (e *Endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// CORS
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS, POST")
@@ -121,7 +121,7 @@ func (e *HTTPEndpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (e *HTTPEndpoint) Close() error {
+func (e *Endpoint) Close() error {
 	close(e.stopCh)
 	if e.httpServer == nil {
 		return nil
@@ -342,7 +342,7 @@ func ParseIETFDoHProtocol(r *http.Request) *types.Context {
 	return ctx
 }
 
-func (e *HTTPEndpoint) responseOnJSON(ctx *types.Context, w http.ResponseWriter) {
+func (e *Endpoint) responseOnJSON(ctx *types.Context, w http.ResponseWriter) {
 	if err := ctx.Error(); err != nil {
 		w.Header().Set("Content-Type", constant.ContentTypeApplicationJSON)
 		w.Write([]byte(`{"error":"` + err.Error() + `"}`))
@@ -367,7 +367,7 @@ func (e *HTTPEndpoint) responseOnJSON(ctx *types.Context, w http.ResponseWriter)
 	w.Write(payload)
 }
 
-func (e *HTTPEndpoint) responseOnDNSMsg(ctx *types.Context, w http.ResponseWriter) {
+func (e *Endpoint) responseOnDNSMsg(ctx *types.Context, w http.ResponseWriter) {
 
 	if err := ctx.Error(); err != nil {
 		w.Header().Set("Content-Type", constant.ContentTypeApplicationJSON)

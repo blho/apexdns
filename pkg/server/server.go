@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"strings"
 
@@ -15,10 +14,10 @@ import (
 )
 
 type Server struct {
-	endpoints  []Endpoint
+	endpoints  []types.Endpoint
 	logger     *logrus.Logger
 	opts       Options
-	conf       RootConfig
+	conf       []caddyfile.ServerBlock
 	zoneEngine map[string]*Engine
 }
 
@@ -56,66 +55,63 @@ func (s *Server) loadConfigFile() error {
 	if err != nil {
 		return err
 	}
-	for _, block := range blocks {
-		// Get the first key of block
-		zone := block.Keys[0]
-		if zone == "apexdns" {
-			// Is a root config
-			rootConfig, err := ParseRootConfig(block)
-			if err != nil {
-				return err
+	s.conf = blocks
+	return nil
+}
+
+func (s *Server) setupLogger() error {
+	logLevel := "debug"
+	for _, block := range s.conf {
+		if len(block.Keys) == 0 {
+			continue
+		}
+		if block.Keys[0] == "apexdns" {
+			if logConfig, ok := block.Tokens["log"]; ok && len(logConfig) > 1 {
+				logLevel = logConfig[1].Text
 			}
-			s.conf = *rootConfig
+			break
+		}
+	}
+	level, err := logrus.ParseLevel(logLevel)
+	if err != nil {
+		return err
+	}
+	s.logger = logs.MustSetup(logs.WithLogLevel(level), logs.WithSourceHook())
+	s.logger.Info("Initialized logger")
+	return nil
+}
+
+func (s *Server) setupEndpoints() error {
+	for _, block := range s.conf {
+		if len(block.Keys) == 0 {
+			continue
+		}
+		if block.Keys[0] == "apexdns" {
+			for k, v := range block.Tokens {
+				endpointInitializer, ok := GetEndpoint(k)
+				if !ok {
+					s.logger.Debugf("%s is not a endpoint, skip", k)
+					continue
+				}
+				edp, err := endpointInitializer.SetupFunc(types.EndpointConfig{
+					Logger:    s.logger.WithField("endpoint", endpointInitializer.Name),
+					Handler:   s.handleContext,
+					Dispenser: caddyfile.NewDispenserTokens(s.opts.ConfigPath, v),
+				})
+				if err != nil {
+					s.logger.WithError(err).Errorf("Failed to setup endpoint: %s", k)
+					return err
+				}
+				s.endpoints = append(s.endpoints, edp)
+			}
 			break
 		}
 	}
 	return nil
 }
 
-func (s *Server) setupLogger() error {
-	level, err := logrus.ParseLevel(s.conf.LogLevel)
-	if err != nil {
-		return err
-	}
-	s.logger = logs.MustSetup(logs.WithLogLevel(level), logs.WithSourceHook())
-	return nil
-}
-
-func (s *Server) setupEndpoints() error {
-	var (
-		endpoint Endpoint
-		err      error
-	)
-	for _, endpointConfig := range s.conf.Endpoints {
-		switch endpointConfig.Type {
-		case "http", "https":
-			s.logger.WithFields(logrus.Fields{
-				"listen":   endpointConfig.Listen,
-				"certFile": endpointConfig.CertFile,
-				"keyFile":  endpointConfig.KeyFile,
-			}).Info("Setting up HTTP(S) endpoint")
-			endpoint, err = NewHTTPEndpoint(endpointConfig.Listen, endpointConfig.CertFile, endpointConfig.KeyFile, s.handleContext)
-		default:
-			return fmt.Errorf("unsupported endpoint: %s", endpointConfig.Type)
-		}
-		if err != nil {
-			return err
-		}
-		s.endpoints = append(s.endpoints, endpoint)
-	}
-	return nil
-}
-
 func (s *Server) setupEngine() error {
-	configFile, err := ioutil.ReadFile(s.opts.ConfigPath)
-	if err != nil {
-		return err
-	}
-	blocks, err := caddyfile.Parse(s.opts.ConfigPath, bytes.NewReader(configFile), nil)
-	if err != nil {
-		return err
-	}
-	for _, block := range blocks {
+	for _, block := range s.conf {
 		if len(block.Keys) == 0 {
 			continue
 		}
