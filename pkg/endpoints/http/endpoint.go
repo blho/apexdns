@@ -121,6 +121,7 @@ func (e *Endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// TODO(@oif): Graceful shutdown
 func (e *Endpoint) Close() error {
 	close(e.stopCh)
 	if e.httpServer == nil {
@@ -156,7 +157,8 @@ func ParseGoogleDoHProtocol(r *http.Request) *types.Context {
 		return ctx
 	}
 
-	rrType := uint16(1)
+	// Default to A record
+	rrType := dns.TypeA
 	rrTypeStr := r.FormValue("type")
 	if rrTypeStr != "" {
 		// try uint16
@@ -172,35 +174,22 @@ func ParseGoogleDoHProtocol(r *http.Request) *types.Context {
 		}
 	}
 
-	CheckingDisabled := false
 	cdStr := r.FormValue("cd")
-	switch cdStr {
-	case "":
-		// use default value
-	case "1", "true":
-		CheckingDisabled = true
-	case "0", "false":
-		CheckingDisabled = false
-	default:
+	checkingDisabled, ok := parseGenericBool(cdStr, false)
+	if !ok {
 		ctx.AbortWithErr(fmt.Errorf("invalid DNSSEC checking disabled(cd): %s", cdStr))
 		return ctx
 	}
 
-	includeDNSSECRecord := false
-	do := r.FormValue("do")
-	switch do {
-	case "":
-	case "1", "true":
-		includeDNSSECRecord = true
-	case "0", "false":
-		includeDNSSECRecord = false
-	default:
-		ctx.AbortWithErr(fmt.Errorf("invalid do: %s", do))
+	doStr := r.FormValue("do")
+	includeDNSSECRecord, ok := parseGenericBool(doStr, false)
+	if !ok {
+		ctx.AbortWithErr(fmt.Errorf("invalid do: %s", doStr))
 		return ctx
 	}
 	// Set msg
 	msg.SetQuestion(dns.Fqdn(domainName), rrType)
-	msg.CheckingDisabled = CheckingDisabled
+	msg.CheckingDisabled = checkingDisabled
 	opt := new(dns.OPT)
 	opt.Hdr.Name = "."
 	opt.Hdr.Rrtype = dns.TypeOPT
@@ -209,6 +198,7 @@ func ParseGoogleDoHProtocol(r *http.Request) *types.Context {
 	if !checkDisabledECS(r) {
 		// ECS
 		var (
+			// Unspecified netmask size set to 256
 			ednsNetmask   = uint16(256)
 			ednsIPAddress net.IP
 		)
@@ -368,7 +358,6 @@ func (e *Endpoint) responseOnJSON(ctx *types.Context, w http.ResponseWriter) {
 }
 
 func (e *Endpoint) responseOnDNSMsg(ctx *types.Context, w http.ResponseWriter) {
-
 	if err := ctx.Error(); err != nil {
 		w.Header().Set("Content-Type", constant.ContentTypeApplicationJSON)
 		w.Write([]byte(`{"error":"` + err.Error() + `"}`))
@@ -391,4 +380,19 @@ func (e *Endpoint) responseOnDNSMsg(ctx *types.Context, w http.ResponseWriter) {
 	}
 	w.Header().Set("Content-Type", constant.ContentTypeApplicationDNSMessage)
 	_, _ = w.Write(result)
+}
+
+func parseGenericBool(raw string, defaultValue bool) (result, ok bool) {
+	switch raw {
+	case "":
+		// use default value
+		return defaultValue, true
+	case "1", "true":
+		result = true
+	case "0", "false":
+		result = false
+	default:
+		return false, false
+	}
+	return result, true
 }
