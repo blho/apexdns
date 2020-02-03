@@ -107,6 +107,7 @@ func (e *Endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// TODO(@oif): Check `CheckingDisabled` and validate DNSSEC
 	// Confirm response content type
 	switch contentType {
 	case constant.ContentTypeApplicationDNSMessage, constant.ContentTypeApplicationUDPWireFormat:
