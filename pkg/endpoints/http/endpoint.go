@@ -14,8 +14,6 @@ import (
 
 	"github.com/blho/apexdns/pkg/constant"
 	"github.com/blho/apexdns/pkg/types"
-	"github.com/blho/apexdns/pkg/utils/uuid"
-
 	"github.com/miekg/dns"
 	"golang.org/x/net/idna"
 )
@@ -149,7 +147,7 @@ func ParseGoogleDoHProtocol(r *http.Request) *types.Context {
 		return nil
 	}
 	msg := new(dns.Msg)
-	ctx := types.NewContext(uuid.Get(), msg)
+	ctx := types.NewContext(msg)
 	if punycode, err := idna.ToASCII(domainName); err == nil {
 		domainName = punycode
 	} else {
@@ -269,7 +267,7 @@ func ParseGoogleDoHProtocol(r *http.Request) *types.Context {
 // Reference https://www.rfc-editor.org/rfc/rfc8484.html
 func ParseIETFDoHProtocol(r *http.Request) *types.Context {
 	msg := new(dns.Msg)
-	ctx := types.NewContext(uuid.Get(), msg)
+	ctx := types.NewContext(msg)
 	var (
 		rawMessage []byte
 		err        error

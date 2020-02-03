@@ -1,10 +1,14 @@
 package types
 
 import (
-	"github.com/miekg/dns"
 	"sync"
+
+	"github.com/blho/apexdns/pkg/utils/uuid"
+
+	"github.com/miekg/dns"
 )
 
+// Context used for processing every DNS resolve request during server, endpoints and plugins
 type Context struct {
 	uuid            string
 	queryMessage    *dns.Msg
@@ -15,19 +19,14 @@ type Context struct {
 	lock            sync.Mutex
 }
 
-func NewContext(uuid string, queryMessage *dns.Msg) *Context {
+// NewContext returns a brand new context with query DNS message
+func NewContext(queryMessage *dns.Msg) *Context {
 	c := &Context{
-		uuid:         uuid,
+		uuid:         uuid.Get(),
 		queryMessage: queryMessage,
 		payload:      make(map[string]interface{}),
 	}
 	return c
-}
-
-func (c *Context) Abort() {
-	c.lock.Lock()
-	c.isAbort = true
-	c.lock.Unlock()
 }
 
 func (c *Context) AbortWithErr(err error) {
