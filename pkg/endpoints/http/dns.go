@@ -1,4 +1,4 @@
-package types
+package http
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// DNSResponse implements Google DoH protocol
 type DNSResponse struct {
 	Status             uint32        `json:"Status"`
 	Truncated          bool          `json:"TC"`

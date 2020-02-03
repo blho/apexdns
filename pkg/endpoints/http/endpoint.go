@@ -344,7 +344,7 @@ func (e *Endpoint) responseOnJSON(ctx *types.Context, w http.ResponseWriter) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	payload, err := json.Marshal(types.ParseDNSResponseFromMessage(resp))
+	payload, err := json.Marshal(ParseDNSResponseFromMessage(resp))
 	if err != nil {
 		w.Header().Set("Content-Type", constant.ContentTypeApplicationJSON)
 		w.Write([]byte(`{"error":"` + err.Error() + `"}`))
