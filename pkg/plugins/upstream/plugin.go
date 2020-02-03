@@ -91,7 +91,7 @@ func (p *Plugin) Handle(ctx *types.Context) {
 func (p *Plugin) bestUpstream() *ups {
 	best := 0
 	for i := 0; i < len(p.upstreams); i++ {
-		if p.upstreams[i].srtt < p.upstreams[0].srtt {
+		if p.upstreams[i].srtt < p.upstreams[best].srtt {
 			best = i
 		}
 	}
