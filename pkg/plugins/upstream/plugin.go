@@ -13,7 +13,7 @@ import (
 type ups struct {
 	net  string
 	addr string
-	srtt float32
+	srtt float64
 }
 
 func (u *ups) srttAttenuation() {
@@ -22,14 +22,16 @@ func (u *ups) srttAttenuation() {
 
 func (u *ups) exchange(ctx context.Context, client *dns.Client, msg *dns.Msg) (r *dns.Msg, rtt time.Duration, err error) {
 	r, rtt, err = client.ExchangeContext(ctx, msg, u.addr)
-	if err != nil { //
-		u.srtt = u.srtt + 200
-	} else { // success
-		if rtt > 300 {
-			rtt = 300
+	go func(ms float64, hasError bool) {
+		if hasError {
+			u.srtt = u.srtt + 200
+			return
 		}
-		u.srtt = u.srtt*0.7 + float32(rtt)*0.3
-	}
+		if ms > 300 {
+			ms = 300
+		}
+		u.srtt = u.srtt*0.7 + ms*0.3
+	}(float64(rtt/time.Millisecond), err != nil)
 	return r, rtt, err
 }
 
