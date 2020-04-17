@@ -46,9 +46,12 @@ func (e *Engine) loadPlugins(tokens map[string][]caddyfile.Token) error {
 
 func (e *Engine) Handle(ctx *types.Context) {
 	for _, plugin := range e.pluginChain {
-		if ctx.Error() != nil {
-			return
+		if ctx.IsAbort() {
+			break
 		}
 		plugin.Handle(ctx)
+	}
+	for _, plugin := range e.pluginChain {
+		plugin.Tail(ctx)
 	}
 }
