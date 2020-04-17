@@ -40,6 +40,12 @@ func (c *Context) Error() error {
 	return c.err
 }
 
+func (c *Context) Abort() {
+	c.lock.Lock()
+	c.isAbort = true
+	c.lock.Unlock()
+}
+
 func (c *Context) IsAbort() bool {
 	c.lock.Lock()
 	v := c.isAbort

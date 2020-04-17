@@ -12,6 +12,7 @@ type PluginSetupFunc func(PluginConfig) (Plugin, error)
 type Plugin interface {
 	Name() string
 	Handle(*Context)
+	Tail(*Context)
 }
 
 type PluginInitializer struct {

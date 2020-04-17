@@ -70,6 +70,8 @@ func (p *Plugin) Name() string {
 	return Name
 }
 
+func (p *Plugin) Tail(*types.Context) {}
+
 func (p *Plugin) Handle(ctx *types.Context) {
 	u := p.bestUpstream()
 	dnsClient := p.tcpClient
