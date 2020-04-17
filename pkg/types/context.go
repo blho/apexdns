@@ -1,6 +1,7 @@
 package types
 
 import (
+	"net"
 	"sync"
 
 	"github.com/blho/apexdns/pkg/utils/uuid"
@@ -11,6 +12,7 @@ import (
 // Context used for processing every DNS resolve request during server, endpoints and plugins
 type Context struct {
 	uuid            string
+	clientIP        net.IP
 	queryMessage    *dns.Msg
 	responseMessage *dns.Msg
 	isAbort         bool
@@ -20,9 +22,10 @@ type Context struct {
 }
 
 // NewContext returns a brand new context with query DNS message
-func NewContext(queryMessage *dns.Msg) *Context {
+func NewContext(clientIP net.IP, queryMessage *dns.Msg) *Context {
 	c := &Context{
 		uuid:         uuid.Get(),
+		clientIP:     clientIP,
 		queryMessage: queryMessage,
 		payload:      make(map[string]interface{}),
 	}
@@ -80,4 +83,8 @@ func (c *Context) SetResponse(msg *dns.Msg) {
 
 func (c *Context) GetResponse() *dns.Msg {
 	return c.responseMessage
+}
+
+func (c *Context) ClientIP() net.IP {
+	return c.clientIP
 }

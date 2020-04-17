@@ -148,7 +148,7 @@ func ParseGoogleDoHProtocol(r *http.Request) *types.Context {
 		return nil
 	}
 	msg := new(dns.Msg)
-	ctx := types.NewContext(msg)
+	ctx := types.NewContext(GetClientIPFromRequest(r), msg)
 	if punycode, err := idna.ToASCII(domainName); err == nil {
 		domainName = punycode
 	} else {
@@ -204,8 +204,7 @@ func ParseGoogleDoHProtocol(r *http.Request) *types.Context {
 
 		if ednsClientSubnet := r.FormValue("edns_client_subnet"); ednsClientSubnet == "" {
 			// Get IP from request
-			ip := GetClientIPFromRequest(r)
-			if ip != nil {
+			if ip := ctx.ClientIP(); ip != nil {
 				ednsIPAddress = ip
 			}
 		} else {
@@ -268,7 +267,7 @@ func ParseGoogleDoHProtocol(r *http.Request) *types.Context {
 // Reference https://www.rfc-editor.org/rfc/rfc8484.html
 func ParseIETFDoHProtocol(r *http.Request) *types.Context {
 	msg := new(dns.Msg)
-	ctx := types.NewContext(msg)
+	ctx := types.NewContext(GetClientIPFromRequest(r), msg)
 	var (
 		rawMessage []byte
 		err        error
@@ -309,8 +308,7 @@ func ParseIETFDoHProtocol(r *http.Request) *types.Context {
 	}
 	if !checkDisabledECS(r) && !hasEDNS0SubnetOption {
 		// Get IP from request
-		ip := GetClientIPFromRequest(r)
-		if ip != nil {
+		if ip := ctx.ClientIP(); ip != nil {
 			// Default IPv4 subnet /24, IPv6 subnet /56
 			family := uint16(1)
 			netmask := uint8(24)
