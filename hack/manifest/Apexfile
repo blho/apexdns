@@ -15,5 +15,6 @@ heidong.io. {
         udp 8.8.8.8:53
         tcp-tls 8.8.8.8:853
     }
+    cache
 }
 
