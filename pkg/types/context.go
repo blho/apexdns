@@ -7,6 +7,7 @@ import (
 	"github.com/blho/apexdns/pkg/utils/uuid"
 
 	"github.com/miekg/dns"
+	"github.com/sirupsen/logrus"
 )
 
 // Context used for processing every DNS resolve request during server, endpoints and plugins
@@ -87,4 +88,15 @@ func (c *Context) GetResponse() *dns.Msg {
 
 func (c *Context) ClientIP() net.IP {
 	return c.clientIP
+}
+
+func (c *Context) GetLogger(logger *logrus.Entry) *logrus.Entry {
+	fields := logrus.Fields{}
+	if clientIP := c.ClientIP(); clientIP != nil {
+		fields["clientIP"] = clientIP
+	}
+	if query := c.GetQueryMessage(); query != nil && len(query.Question) > 0 {
+		fields["question"] = query.Question[0].String()
+	}
+	return logger.WithFields(fields)
 }
