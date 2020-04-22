@@ -6,7 +6,7 @@ apexdns {
 
 heidong.io. {
     upstream {
-        tcp-tls 8.8.8.8:853
+        tcp-tls 8.8.8.8:853 127.0.0.1:1080
     }
 }
 
