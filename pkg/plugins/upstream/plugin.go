@@ -1,8 +1,6 @@
 package upstream
 
 import (
-	"context"
-
 	"github.com/blho/apexdns/pkg/types"
 
 	"github.com/miekg/dns"
@@ -30,12 +28,13 @@ func (p *Plugin) Name() string {
 func (p *Plugin) Tail(*types.Context) {}
 
 func (p *Plugin) Handle(ctx *types.Context) {
-	response, _, err := p.bestUpstream().exchange(context.Background(), ctx.GetQueryMessage())
+	response, rtt, err := p.bestUpstream().Exchange(ctx.GetQueryMessage())
 	if err != nil {
 		p.logger.WithError(err).Error("Unable to exchange query")
 		ctx.AbortWithErr(err)
 		return
 	}
+	ctx.GetLogger(p.logger).Debugf("Exchanged %s", rtt)
 	ctx.SetResponse(response)
 }
 
