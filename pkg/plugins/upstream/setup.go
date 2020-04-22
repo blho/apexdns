@@ -3,9 +3,10 @@ package upstream
 import (
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/blho/apexdns/pkg/server"
 	"github.com/blho/apexdns/pkg/types"
-	"time"
 )
 
 const (
@@ -31,46 +32,25 @@ func parse(conf types.PluginConfig) (*Plugin, error) {
 	)
 	plug.logger = conf.Logger.WithField("plugin", Name)
 	args := conf.RemainingArgs()
+	var upstreamTimeout time.Duration
 	if len(args) > 0 {
 		timeout, err := time.ParseDuration(args[0])
 		if err != nil {
 			return nil, err
 		}
-		plug.timeout = timeout
+		upstreamTimeout = timeout
 		plug.logger.WithField("timeout", timeout).Debug("Get DNS client timeout")
 	}
 	for conf.NextBlock() {
 		switch kind := conf.Val(); kind {
-		case "tcp":
+		case "tcp", "udp", "tcp-tls":
 			args := conf.RemainingArgs()
-			if len(args) == 0 {
-				return nil, errors.New("upstream is required")
+			plug.logger.Infof("Adding %s upstream: %v", kind, args)
+			upstream, err := parseUpstreamArgs(kind, args, upstreamTimeout)
+			if err != nil {
+				return nil, err
 			}
-			plug.logger.Debugf("Added TCP upstream: %s", args[0])
-			plug.upstreams = append(plug.upstreams, &ups{
-				net:  kind,
-				addr: args[0],
-			})
-		case "udp":
-			args := conf.RemainingArgs()
-			if len(args) == 0 {
-				return nil, errors.New("upstream is required")
-			}
-			plug.logger.Debugf("Added UDP upstream: %s", args[0])
-			plug.upstreams = append(plug.upstreams, &ups{
-				net:  kind,
-				addr: args[0],
-			})
-		case "tcp-tls":
-			args := conf.RemainingArgs()
-			if len(args) == 0 {
-				return nil, errors.New("upstream is required")
-			}
-			plug.logger.Debugf("Added TCP-TLS upstream: %s", args[0])
-			plug.upstreams = append(plug.upstreams, &ups{
-				net:  kind,
-				addr: args[0],
-			})
+			plug.upstreams = append(plug.upstreams, upstream)
 		default:
 			return nil, fmt.Errorf("unknown config in upstream: %s %v", conf.Val(), conf.RemainingArgs())
 		}
@@ -79,4 +59,20 @@ func parse(conf types.PluginConfig) (*Plugin, error) {
 	plug.initialize()
 	plug.logger.Info("Initialized upstream plugin")
 	return plug, nil
+}
+
+func parseUpstreamArgs(kind string, args []string, timeout time.Duration) (*ups, error) {
+	// args upstreamAddr [socks5Addr]
+	if len(args) == 0 {
+		return nil, errors.New("upstream is required")
+	}
+	// TODO(@oif): Check address format <IP>:<Port>
+	var (
+		upstreamAddr    = args[0]
+		socks5ProxyAddr string
+	)
+	if len(args) == 2 {
+		socks5ProxyAddr = args[1]
+	}
+	return newUpstream(kind, upstreamAddr, socks5ProxyAddr, timeout)
 }
